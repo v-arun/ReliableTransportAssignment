@@ -286,8 +286,8 @@ public class ChannelEmulator {
 		}
 		else
 			log.fine("Dropping message from " + getNameString(srcAddr) + " to " +
-					"" + "" + "" + getNameString(dgram) + " : " + truncate
-					(dgram));
+					"" + "" + "" + "" + "" + "" + getNameString(dgram) + " : "
+					+ truncate(dgram));
 	}
 
 	/* End of methods to mangle packets being relayed by the channel. */
@@ -363,20 +363,26 @@ public class ChannelEmulator {
 					 * 0 as per the implementation of lose, corrupt, and delay
 					  * methods above.
 					 */
-					if (parts[i].equals(Commands.LOSS.toString()) && allowCHNL
-							(dgram)) {
-						cinfo.loss = Double.valueOf(parts[i + 1]);
-						log.fine("Setting LOSS to " + cinfo.loss);
+					if (parts[i].equals(Commands.LOSS.toString())) {
+						if (allowCHNL(dgram)) {
+							cinfo.loss = Double.valueOf(parts[i + 1]);
+							log.fine("Setting LOSS to " + cinfo.loss);
+						}
 					}
-					else if (parts[i].equals(Commands.DELAY.toString()) &&
-							allowCHNL(dgram))
-						cinfo.delay = Double.valueOf(parts[i + 1]);
+					else if (parts[i].equals(Commands.DELAY.toString())) {
+						if (allowCHNL(dgram))
+							cinfo.delay = Double.valueOf(parts[i + 1]);
+					}
 					else if (parts[i].equals(Commands.DELAY_DEV_RATIO.toString
-							()) && allowCHNL(dgram))
-						cinfo.delay_dev_ratio = Double.valueOf(parts[i + 1]);
-					else if (parts[i].equals(Commands.CORRUPTION.toString())
-							&& allowCHNL(dgram))
-						cinfo.corruption = Double.valueOf(parts[i + 1]);
+							())) {
+						if (allowCHNL(dgram))
+							cinfo.delay_dev_ratio = Double.valueOf(parts[i +
+									1]);
+					}
+					else if (parts[i].equals(Commands.CORRUPTION.toString())) {
+						if (allowCHNL(dgram))
+							cinfo.corruption = Double.valueOf(parts[i + 1]);
+					}
 					else parsed = parsed && false;
 				} catch (NumberFormatException nfe) {
 					parsed = parsed && false;
@@ -384,10 +390,11 @@ public class ChannelEmulator {
 			}
 			if (parsed) {
 				// send OK even if not allowed
-				response = Commands.OK.toString() + " " + msg;
+				response = Commands.OK.toString() + " " + msg + (!allowCHNL
+						(dgram) ? " [ignoring disabled " + Commands.CHNL
+						.toString() + " commands]" : "");
 				if (allowCHNL(dgram)) sockToCinfo.put(isaddr, cinfo);
-			}
-			if (PRIVILEGED_MODE && allowCHNL(dgram)) { // will behave fine
+			} if (PRIVILEGED_MODE && allowCHNL(dgram)) { // will behave fine
 				// even with bad CHNL
 				// commands
 				LOSS = cinfo.loss;
@@ -397,10 +404,10 @@ public class ChannelEmulator {
 			}
 		}
 		else if (cmd.equals(Commands.CHNL.toString()) && parts.length == 2 &&
-				parts[1].equals(Commands.PARAMS.toString()) && allowCHNL
-				(dgram) && (room = haveRoom(cinfo))) {
+				parts[1].equals(Commands.PARAMS.toString()) &&
+				(room = haveRoom(cinfo))) {
 			response = Commands.OK.toString() + " " + Commands.CHNL.toString()
-					+ " " + printParams(cinfo);
+					+ " " + (allowCHNL(dgram) ? printParams(cinfo):"");
 
 		}
 		else if (cmd.equals(Commands.LIST.toString()) && parts.length == 1 &&
@@ -410,8 +417,7 @@ public class ChannelEmulator {
 			for (String name : nameToSock.keySet()) {
 				response += (name + nameToSock.get(name) + " ");
 			}
-		}
-		if (!room)
+		} if (!room)
 			response = "!" + Commands.OK + ": chat server too crowded, try " +
 					"again later";
 		return (response != null ? response + "\n" : null);
@@ -605,7 +611,7 @@ public class ChannelEmulator {
 				continue;
 			}
 		}
-		if (!PRIVILEGED_MODE) setLogLevel(Level.FINE);
+		//if (!PRIVILEGED_MODE) setLogLevel(Level.FINE);
 
 	}
 
@@ -614,16 +620,16 @@ public class ChannelEmulator {
 		return " [ LOSS " + (cinfo != null ? cinfo.loss : LOSS) + "  DELAY " +
 				(cinfo != null ? cinfo.delay : DELAY) + "  DELAY_DEV_RATIO " +
 				(cinfo != null ? cinfo.delay_dev_ratio : DELAY_DEV_RATIO) + " " +
-				"" + "" + " CORRUPTION " + (cinfo != null ? cinfo.corruption :
-				CORRUPTION) + (PRIVILEGED_MODE ? "  privileged_user " +
-				privileged_user : "") + " ]";
+				"" + "" + "" + "" + "" + " CORRUPTION " + (cinfo != null ?
+				cinfo.corruption : CORRUPTION) + (PRIVILEGED_MODE ? "  " +
+				"privileged_user " + privileged_user : "") + " ]";
 	}
 
 	// Printing overall stats
 	private String printStats() {
 		return "ChannelEmulator: |sockToCinfo| = " + sockToCinfo.size() + " , " +
-				"" + "" + "|nameToSock| = " + nameToSock.size() + " , TQSize =" +
-				" " + TQSize + "\n";
+				"" + "" + "" + "" + "" + "|nameToSock| = " + nameToSock.size()
+				+ " " + ", " + "TQSize =" + " " + TQSize + "\n";
 	}
 
 	/*
@@ -694,6 +700,7 @@ public class ChannelEmulator {
 
 	private static void setLogLevel(Level level) {
 		ch.setLevel(level);
+		log.removeHandler(ch);
 		log.addHandler(ch);
 		log.setLevel(level);
 		log.setUseParentHandlers(false);
